@@ -197,7 +197,7 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Strict Hover-Sweep Interaction Engine", style: TextStyle(fontSize: 16)),
+        title: const Text("", style: TextStyle(fontSize: 16)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -339,37 +339,68 @@ class RubiksCube3D extends StatelessWidget {
         _addPoint(faces, globalTransform, 0, 0, offset, i > 0 ? Colors.blueAccent : Colors.blue[900]!);
     }
     
-    // Add explicitly pointing vector arrowheads and text markers to the positive ends
-    _addAxisLabel(faces, globalTransform, 320, 0, 0, Colors.redAccent, "X Axis\n(Tabletop Breadth)", Matrix4.identity()..rotateZ(-pi/2));
-    _addAxisLabel(faces, globalTransform, 0, 320, 0, Colors.greenAccent, "Y Axis\n(Tabletop Depth)", Matrix4.identity()..rotateX(pi/2));
-    _addAxisLabel(faces, globalTransform, 0, 0, 320, Colors.blueAccent, "Z Axis\n(Vertical)", Matrix4.identity());
+    // Add explicitly pointing flat text markers to the positive ends
+    _addAxisLabel(faces, globalTransform, 320, 0, 0, Colors.redAccent, "X Axis\n(Breadth)");
+    _addAxisLabel(faces, globalTransform, 0, 320, 0, Colors.greenAccent, "Y Axis\n(Depth)");
+    _addAxisLabel(faces, globalTransform, 0, 0, 320, Colors.blueAccent, "Z Axis\n(Vertical)");
   }
 
   void _addPoint(List<_FaceData> faces, Matrix4 globalTransform, double tx, double ty, double tz, Color color) {
     final trans = globalTransform.clone()..translate(tx, ty, tz);
-    faces.add(_FaceData(Transform(
-      transform: trans, alignment: Alignment.center,
-      child: IgnorePointer(child: Container(width: 4, height: 4, decoration: BoxDecoration(color: color, shape: BoxShape.circle)))),
-    ), trans.getTranslation().z);
+    faces.add(_FaceData(
+      Transform(
+        transform: trans, 
+        alignment: Alignment.center,
+        child: IgnorePointer(child: Container(width: 4, height: 4, decoration: BoxDecoration(color: color, shape: BoxShape.circle)))
+      ), 
+      trans.getTranslation().z
+    ));
   }
 
-  void _addAxisLabel(List<_FaceData> faces, Matrix4 globalTransform, double tx, double ty, double tz, Color color, String text, Matrix4 arrowRot) {
-      final trans = globalTransform.clone()..translate(tx, ty, tz);
+  void _addAxisLabel(List<_FaceData> faces, Matrix4 globalTransform, double tx, double ty, double tz, Color color, String text) {
+      // 1. Calculate the final end point of the axis in screen space
+      Vector4 p1 = Vector4(tx, ty, tz, 1.0);
+      globalTransform.transform(p1);
+      
+      // 2. Calculate a second point slightly behind the tip to build a 2D line vector
+      double mag = sqrt(tx*tx + ty*ty + tz*tz);
+      double cx = tx == 0 ? 0 : tx - (tx/mag * 20);
+      double cy = ty == 0 ? 0 : ty - (ty/mag * 20);
+      double cz = tz == 0 ? 0 : tz - (tz/mag * 20);
+      
+      Vector4 p0 = Vector4(cx, cy, cz, 1.0);
+      globalTransform.transform(p0);
+
+      // Extract raw 2D screen coordinates
+      double x1 = p1.x / p1.w; double y1 = p1.y / p1.w;
+      double x0 = p0.x / p0.w; double y0 = p0.y / p0.w;
+
+      // 3. Compute absolute screen angle of the drawn line
+      double dx = x1 - x0;
+      double dy = y1 - y0;
+      double screenAngle = atan2(dy, dx); 
+      
       faces.add(_FaceData(Transform(
-        transform: trans, alignment: Alignment.center,
+        transform: Matrix4.identity()..translate(x1, y1, 0.0), 
+        alignment: Alignment.center,
         child: IgnorePointer(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Transform(
-                transform: arrowRot, alignment: Alignment.center, 
-                child: Icon(Icons.arrow_upward, color: color, size: 50, shadows: const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(2, 2))])
+              // Draw the Arrow Head, perfectly flat against the screen, pointing along the line's visual trajectory
+              Transform.rotate(
+                angle: screenAngle + (pi / 2), // Maps default Icons.arrow_upward (-Y) to the computed line angle
+                child: Icon(Icons.arrow_upward, color: color, size: 40, shadows: const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(2, 2))]),
               ),
-              Text(text, textAlign: TextAlign.center, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 18, shadows: const [Shadow(color: Colors.black, blurRadius: 4, offset: Offset(2, 2))])),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xDD111111), borderRadius: BorderRadius.circular(6), border: Border.all(color: color, width: 1.5)),
+                child: Text(text, textAlign: TextAlign.center, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
             ],
           ),
         ),
-      ), trans.getTranslation().z));
+      ), p1.z / p1.w));
   }
 
   _FaceData _createFace(Color baseColor, Matrix4 faceTransform, Cubie cubie, Matrix4 globalTransform, double nx, double ny, double nz, String label) {

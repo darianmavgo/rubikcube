@@ -130,7 +130,7 @@ class RubiksCube3D extends StatelessWidget {
     // Without Z-sorting, Flutter's Stack will draw faces arbitrarily causing visual overlapping bugs 
     // at certain rotation angles. We dynamically calculate each face's true Z depth via the 
     // combined local/global transform matrix and sort them before rendering.
-    faces.sort((a, b) => a.z.compareTo(b.z));
+    faces.sort((a, b) => b.z.compareTo(a.z));
 
     return SizedBox(
       width: size,

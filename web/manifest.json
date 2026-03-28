@@ -1,6 +1,6 @@
 {
-    "name": "rubiks_cube",
-    "short_name": "rubiks_cube",
+    "name": "rubikcube",
+    "short_name": "rubikcube",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

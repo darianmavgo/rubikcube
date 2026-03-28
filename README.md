@@ -7,8 +7,8 @@ This plan details the process of building a Rubik's Cube game using Flutter alon
 ### 1. Project Initialization
 - Create a new, clean Flutter project specifically tailored for this game:
   ```bash
-  flutter create --platforms=web,macos rubiks_cube
-  cd rubiks_cube
+  flutter create --platforms=web,macos rubikcube
+  cd rubikcube
   ```
 
 ### 2. Integrate the Fluorite Engine

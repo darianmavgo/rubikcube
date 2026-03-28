@@ -30,8 +30,8 @@ class RubiksCubeScreen extends StatefulWidget {
 
 class _RubiksCubeScreenState extends State<RubiksCubeScreen> {
   // Initial isometric perspective
-  double rx = -0.5;
-  double ry = 0.5;
+  double rx = -0.6;
+  double ry = 0.6;
 
   @override
   Widget build(BuildContext context) {
@@ -66,14 +66,8 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> {
                 width: double.infinity,
                 height: double.infinity,
                 child: Center(
-                  child: Transform(
-                    transform: Matrix4.identity()
-                      ..setEntry(3, 2, 0.001) // perspective
-                      ..rotateX(rx)
-                      ..rotateY(ry),
-                    alignment: Alignment.center,
-                    child: const RubiksCube3D(size: 240),
-                  ),
+                  // We pass rx and ry directly to the cube so it can sort the faces dynamically
+                  child: RubiksCube3D(size: 240, rx: rx, ry: ry),
                 ),
               ),
             ),
@@ -83,8 +77,8 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> {
             child: ElevatedButton.icon(
               onPressed: () {
                 setState(() {
-                  rx = -0.5; 
-                  ry = 0.5;
+                  rx = -0.6; 
+                  ry = 0.6;
                 });
               },
               style: ElevatedButton.styleFrom(
@@ -104,69 +98,83 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> {
 
 class RubiksCube3D extends StatelessWidget {
   final double size;
-  const RubiksCube3D({super.key, this.size = 200});
+  final double rx;
+  final double ry;
+
+  const RubiksCube3D({
+    super.key, 
+    this.size = 200,
+    required this.rx,
+    required this.ry,
+  });
 
   @override
   Widget build(BuildContext context) {
+    // Generate the global 3D transformation matrix from current drag state
+    final globalTransform = Matrix4.identity()
+      ..setEntry(3, 2, 0.001) // perspective
+      ..rotateX(rx)
+      ..rotateY(ry);
+
     // Standard Rubik's Colors: U=White, D=Yellow, F=Green, B=Blue, L=Orange, R=Red
-    // Note: Due to Flutter's 2D canvas origin, without z-sorting some back faces 
-    // might overlap the front at extreme angles, but for typical front-facing
-    // views this provides a fantastic native-rendered 3D illusion!
-    
+    List<_FaceData> faces = [
+      _createFace(Colors.blueAccent,   Matrix4.identity()..translate(0.0, 0.0, -size/2)..rotateY(pi), globalTransform),
+      _createFace(Colors.orangeAccent, Matrix4.identity()..translate(-size/2, 0.0, 0.0)..rotateY(-pi / 2), globalTransform),
+      _createFace(Colors.yellowAccent, Matrix4.identity()..translate(0.0, size/2, 0.0)..rotateX(-pi / 2), globalTransform),
+      _createFace(Colors.white,        Matrix4.identity()..translate(0.0, -size/2, 0.0)..rotateX(pi / 2), globalTransform),
+      _createFace(Colors.redAccent,    Matrix4.identity()..translate(size/2, 0.0, 0.0)..rotateY(pi / 2), globalTransform),
+      _createFace(Colors.greenAccent,  Matrix4.identity()..translate(0.0, 0.0, size/2), globalTransform),
+    ];
+
+    // SORTING EXPLANATION:
+    // Without Z-sorting, Flutter's Stack will draw faces arbitrarily causing visual overlapping bugs 
+    // at certain rotation angles. We dynamically calculate each face's true Z depth via the 
+    // combined local/global transform matrix and sort them before rendering.
+    faces.sort((a, b) => a.z.compareTo(b.z));
+
     return SizedBox(
       width: size,
       height: size,
       child: Stack(
         alignment: Alignment.center,
-        children: [
-          // Back Face (Blue)
-          _buildFace(Colors.blueAccent, size, Matrix4.identity()..translate(0.0, 0.0, -size/2)..rotateY(pi)),
-          // Left Face (Orange)
-          _buildFace(Colors.orange, size, Matrix4.identity()..translate(-size/2, 0.0, 0.0)..rotateY(-pi / 2)),
-          // Bottom Face (Yellow)
-          _buildFace(Colors.yellowAccent, size, Matrix4.identity()..translate(0.0, size/2, 0.0)..rotateX(-pi / 2)),
-          // Top Face (White)
-          _buildFace(Colors.white, size, Matrix4.identity()..translate(0.0, -size/2, 0.0)..rotateX(pi / 2)),
-          // Right Face (Red)
-          _buildFace(Colors.redAccent, size, Matrix4.identity()..translate(size/2, 0.0, 0.0)..rotateY(pi / 2)),
-          // Front Face (Green)
-          _buildFace(Colors.greenAccent, size, Matrix4.identity()..translate(0.0, 0.0, size/2)),
-        ],
+        children: faces.map((f) => f.widget).toList(),
       ),
     );
   }
 
-  Widget _buildFace(Color color, double size, Matrix4 transform) {
-    return Transform(
-      transform: transform,
+  _FaceData _createFace(Color color, Matrix4 localTransform, Matrix4 globalTransform) {
+    // Combine the single face's local orientation with the entire cube's global rotation
+    final totalTransform = globalTransform.clone()..multiply(localTransform);
+    
+    // Extract the final Z translation depth. The Z value maps the origin of the face in 3D space.
+    final z = totalTransform.getTranslation().z;
+
+    final widget = Transform(
+      transform: totalTransform,
       alignment: Alignment.center,
       child: Container(
         width: size,
         height: size,
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: const Color(0xFF121212),
-          border: Border.all(color: Colors.black, width: 2),
+          color: const Color(0xFF13131A),
+          border: Border.all(color: Colors.black87, width: 3), // Thicker border between faces
         ),
         child: GridView.builder(
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            crossAxisSpacing: 4,
-            mainAxisSpacing: 4,
+            crossAxisSpacing: 5,
+            mainAxisSpacing: 5,
           ),
           itemCount: 9,
           itemBuilder: (context, index) {
             return Container(
               decoration: BoxDecoration(
                 color: color,
-                borderRadius: BorderRadius.circular(6),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    spreadRadius: 1,
-                    blurRadius: 2,
-                  )
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black45, spreadRadius: 1, blurRadius: 2, offset: Offset(0, 1))
                 ]
               ),
             );
@@ -174,5 +182,13 @@ class RubiksCube3D extends StatelessWidget {
         ),
       ),
     );
+
+    return _FaceData(widget, z);
   }
+}
+
+class _FaceData {
+  final Widget widget;
+  final double z;
+  _FaceData(this.widget, this.z);
 }

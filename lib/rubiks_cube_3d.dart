@@ -62,9 +62,9 @@ class RubiksCube3D extends StatelessWidget {
     }
     
     // Add explicitly pointing flat text markers to the positive ends
-    _addAxisLabel(faces, globalTransform, 320, 0, 0, Colors.redAccent, "X Axis\n(Breadth)");
-    _addAxisLabel(faces, globalTransform, 0, 320, 0, Colors.greenAccent, "Y Axis\n(Depth)");
-    _addAxisLabel(faces, globalTransform, 0, 0, 320, Colors.blueAccent, "Z Axis\n(Vertical)");
+    _addAxisLabel(faces, globalTransform, 320, 0, 0, Colors.redAccent, "x");
+    _addAxisLabel(faces, globalTransform, 0, 320, 0, Colors.greenAccent, "y");
+    _addAxisLabel(faces, globalTransform, 0, 0, 320, Colors.blueAccent, "z");
   }
 
   void _addPoint(List<_FaceData> faces, Matrix4 globalTransform, double tx, double ty, double tz, Color color) {

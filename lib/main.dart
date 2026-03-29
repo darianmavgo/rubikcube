@@ -54,7 +54,7 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> with SingleTickerPr
     super.initState();
     _initCube();
     
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 750));
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1));
     _controller!.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
          _bakeRotation();
@@ -125,7 +125,7 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> with SingleTickerPr
     
     final now = DateTime.now();
     final timestamp = "${now.hour}:${now.minute}:${now.second}.${now.millisecond}";
-    String direction = angle > 0 ? "Clockwise" : "Counter-Clockwise";
+    String direction = angle > 0 ? "Counter-Clockwise" : "Clockwise"; // Invert logic to match standard physical cube rotation (Right-Hand Rule)
     print("[$timestamp] SWIPE ROTATION: Face $faceLabel | Axis $axis | Slice $sliceIndex | Direction: $direction");
 
     _animation = Tween<double>(begin: 0.0, end: angle).animate(
@@ -147,8 +147,10 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> with SingleTickerPr
     
     if ((dx * dx + dy * dy) > 144) {
       _swipeStart = null; 
+
       final localNormal = Vector3(nx, ny, nz);
-      final worldNormal = cubie.transform.transform3(localNormal);
+      final worldNormal = cubie.transform.getRotation().transform(localNormal);
+      worldNormal.normalize();
 
       String normalAxis;
       if (worldNormal.x.abs() > worldNormal.y.abs() && worldNormal.x.abs() > worldNormal.z.abs()) normalAxis = 'x';
@@ -157,6 +159,7 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> with SingleTickerPr
 
       List<String> candidateAxes = ['x', 'y', 'z']..remove(normalAxis);
       
+      // Calculate face center properly using getTranslation() + rotated normal
       final faceCenter = cubie.transform.getTranslation(); 
       faceCenter.x += worldNormal.x * (cubieSize / 2.0);
       faceCenter.y += worldNormal.y * (cubieSize / 2.0);
@@ -172,13 +175,25 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> with SingleTickerPr
         if (axis == 'y') rot.rotateY(0.1);
         if (axis == 'z') rot.rotateZ(0.1);
 
+        // Center point to rotate around is the origin (0,0,0) of the whole cube.
         final simulatedCenter = rot.transform3(faceCenter.clone());
         Vector4 pOrig = Vector4(faceCenter.x, faceCenter.y, faceCenter.z, 1.0);
         Vector4 pSim = Vector4(simulatedCenter.x, simulatedCenter.y, simulatedCenter.z, 1.0);
+
         globalTransform.transform(pOrig); 
         globalTransform.transform(pSim);
 
-        double dot = ((pSim.x / pSim.w) - (pOrig.x / pOrig.w)) * dx + ((pSim.y / pSim.w) - (pOrig.y / pOrig.w)) * dy;
+        // Calculate screen space delta vectors
+        double sx0 = pOrig.x / pOrig.w;
+        double sy0 = pOrig.y / pOrig.w;
+        double sx1 = pSim.x / pSim.w;
+        double sy1 = pSim.y / pSim.w;
+
+        double dSx = sx1 - sx0;
+        double dSy = sy1 - sy0;
+
+        // Project the swipe vector (dx, dy) onto the simulated screen movement (dSx, dSy)
+        double dot = dSx * dx + dSy * dy;
         if (dot.abs() > bestDotAbs) {
           bestDotAbs = dot.abs();
           bestAxis = axis;
@@ -188,6 +203,8 @@ class _RubiksCubeScreenState extends State<RubiksCubeScreen> with SingleTickerPr
 
       final center = cubie.transform.getTranslation();
       int sliceIndex = ( (bestAxis == 'x' ? center.x : bestAxis == 'y' ? center.y : center.z) / cubieSize ).round();
+
+      // Pass the computed parameters to _rotateSlice
       _rotateSlice(axis: bestAxis, sliceIndex: sliceIndex, angle: bestAngleSign * (pi/2), faceLabel: label);
     }
   }

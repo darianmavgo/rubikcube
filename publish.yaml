@@ -1,0 +1,9 @@
+id: publish-cube
+name: Publish Rubik's Cube
+description: Deploy the Flutter Web build of the Rubik's Cube to Cloudflare Pages
+nodes:
+  - id: deploy_cube
+    uses: net/cloudflare/deploy
+    with:
+      project_name: cube-mavgo-com
+      directory: /Users/darianhickman/Documents/rubikcube/build/web
